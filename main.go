@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 )
 
 type RowData struct {
@@ -78,13 +79,12 @@ func FilterAndFillData(TLD string, data []RowData) ([]RowData, error) {
 		if website.Domain == "" || !website.Valid || website.RefIPs == -1 {
 			return rowData, <-errCh
 		}
+		time.Sleep(250 * time.Millisecond)
+		select {
+		case value := <-ch:
+			rowData = append(rowData, value)
+		}
 	}
-	close(errCh)
-	
-	for v := range ch {
-		rowData = append(rowData, v)
-	}
-	close(ch)
 	
 	return rowData, nil
 }
