@@ -1,6 +1,8 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type RowData struct {
 	RankWebsite int
@@ -33,23 +35,32 @@ func GetTLD(domain string) (TLD string, IDN_TLD string) {
 }
 
 func ProcessGetTLD(website RowData, ch chan RowData, chErr chan error) {
-	// TLD, IDN_TLD := GetTLD(website.Domain)
+	TLD, IDN_TLD := GetTLD(website.Domain)
 	
 	// jika website domain kosong
 	if website.Domain == "" {
-		chErr <- fmt.Errorf("domain is empty")
+		chErr <- fmt.Errorf("domain name is empty")
 		return
 	}
 
 	// jika valid bernilai false
 	if !website.Valid {
-		chErr <- fmt.Errorf("domain is not valid")
+		chErr <- fmt.Errorf("domain not valid")
 		return
 	}
 
 	if website.RefIPs == -1 {
-		chErr <- fmt.Errorf("domain has no refIPs")
+		chErr <- fmt.Errorf("domain RefIPs not valid")
 		return
+	}
+
+	ch <- RowData{
+		RankWebsite: website.RankWebsite,
+		Domain: website.Domain,
+		TLD: TLD,
+		IDN_TLD: IDN_TLD,
+		Valid: website.Valid,
+		RefIPs: website.RefIPs,
 	}
 }
 
@@ -59,12 +70,23 @@ var FuncProcessGetTLD = ProcessGetTLD
 func FilterAndFillData(TLD string, data []RowData) ([]RowData, error) {
 	ch := make(chan RowData, len(data))
 	errCh := make(chan error)
-
+	rowData := []RowData{}
+	
 	for _, website := range data {
 		go FuncProcessGetTLD(website, ch, errCh)
+		
+		if website.Domain == "" || !website.Valid || website.RefIPs == -1 {
+			return rowData, <-errCh
+		}
 	}
-
-	return nil, nil // TODO: replace this
+	close(errCh)
+	
+	for v := range ch {
+		rowData = append(rowData, v)
+	}
+	close(ch)
+	
+	return rowData, nil
 }
 
 // gunakan untuk melakukan debugging
